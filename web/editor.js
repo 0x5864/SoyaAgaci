@@ -290,14 +290,24 @@ function createPersonEditor(onSave) {
     const note = get('editor-date-note');
     note.hidden = !conflicts.length;
     note.textContent = conflicts.length
-      ? 'Kaynaklardaki ' + conflicts.join(' ve ') + ' tarihleri farklı. Bir değer girerek tarihi güncelleyebilirsin.'
+      ? 'Birden fazla ' + conflicts.join(' ve ') + ' tarihi kayıtlı. Bir değer girerek tarihi güncelleyebilirsin.'
       : '';
     options = data.people.filter(candidate => candidate.id !== person?.id)
       .sort((a, b) => sortNames.compare(a.name, b.name))
       .map(candidate => ({
         id: candidate.id,
-        label: [candidate.name, years(candidate) || candidate.sources[0]?.cell].filter(Boolean).join(' · '),
+        label: [candidate.name, years(candidate)].filter(Boolean).join(' · '),
       }));
+    const optionCounts = new Map();
+    for (const { label } of options) optionCounts.set(label, (optionCounts.get(label) ?? 0) + 1);
+    const optionIndexes = new Map();
+    for (const option of options) {
+      const label = option.label;
+      if (optionCounts.get(label) < 2) continue;
+      const index = (optionIndexes.get(label) ?? 0) + 1;
+      optionIndexes.set(label, index);
+      option.label += ' · ' + index + '. kayıt';
+    }
     for (const role of parentRoles) fillPersonSelect(fields.namedItem(role), 'Belirtilmemiş');
     if (person) {
       for (const edge of data.relations) {

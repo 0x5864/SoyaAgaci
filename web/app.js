@@ -7,10 +7,8 @@ const showPanel = get('show-panel');
 const detail = get('person-detail');
 const results = get('people-results');
 const list = get('people-list');
-const sources = get('sources');
 const sidebar = get('sidebar-scroll');
 const mobile = matchMedia('(max-width: 690px)');
-const names = { t: 'Tunçgenç', v: 'Veryeri' };
 const sortNames = new Intl.Collator('tr');
 let filter = 'all';
 let selected = null;
@@ -102,19 +100,6 @@ function dateLabel(value) {
   return day ? day + '.' + month + '.' + year : year;
 }
 
-function sourceRecord(source) {
-  const record = make('div', 'record');
-  record.append(make('b', '', names[source.family]), document.createTextNode(' · ' + source.cell));
-  const values = [source.name].filter(Boolean);
-  for (const [field, label] of [['birth', 'Doğum'], ['death', 'Ölüm']]) {
-    if (!source[field]) continue;
-    const placeholder = source.placeholderDates && source[field].startsWith('1900');
-    values.push(label + ' ' + dateLabel(source[field]) + (placeholder ? ' (yer tutucu)' : ''));
-  }
-  record.append(make('div', '', values.join(' · ')));
-  return record;
-}
-
 function renderDetails() {
   detail.hidden = !selected;
   results.hidden = Boolean(selected);
@@ -135,8 +120,10 @@ function renderDetails() {
   const actions = make('div', 'detail-actions');
   actions.append(edit, focus);
   card.append(back, avatar(person), title);
-  const dates = years(person);
-  if (dates) card.append(make('p', 'detail-summary', dates));
+  for (const [field, label] of [['birth', 'Doğum'], ['death', 'Ölüm']]) {
+    const dates = recordedDates(person, field).sort().map(dateLabel);
+    if (dates.length) card.append(make('p', 'record', label + ' · ' + dates.join(' / ')));
+  }
   card.append(actions);
 
   const groupLabels = ['Anne', 'Baba', 'Ebeveyn (rol belirsiz)', 'Eş', 'Çocuklar', 'Üvey bağı', 'Bağ türü belirsiz'];
@@ -161,22 +148,6 @@ function renderDetails() {
     section.append(make('h4', '', label), items);
     card.append(section);
   }
-  if (person.dates) {
-    const edits = make('section', 'detail-group');
-    edits.append(make('h4', '', 'Düzenlenen tarihler'));
-    for (const [field, label] of [['birth', 'Doğum'], ['death', 'Ölüm']]) {
-      if (!Object.hasOwn(person.dates, field)) continue;
-      const value = person.dates[field];
-      edits.append(make('p', 'record', label + ' · ' + (value ? dateLabel(value) : 'Belirtilmedi')));
-    }
-    card.append(edits);
-  }
-  const recordSection = make('section', 'detail-group');
-  recordSection.append(make('h4', '', 'Kaynak kayıtları'));
-  const conflict = ['birth', 'death'].some(field => new Set(person.sources.map(source => source[field]).filter(Boolean)).size > 1);
-  if (conflict) recordSection.append(make('p', 'date-conflict', 'Kaynaklardaki tarih değerleri farklı.'));
-  recordSection.append(...person.sources.map(sourceRecord));
-  if (person.sources.length) card.append(recordSection);
   detail.replaceChildren(card);
 }
 
@@ -399,13 +370,8 @@ get('hide-panel').addEventListener('click', () => {
   togglePanel(false);
   showPanel.focus();
 });
-get('show-sources').addEventListener('click', () => sources.showModal());
-sources.querySelector('button').addEventListener('click', event => {
-  event.preventDefault();
-  sources.close();
-});
 document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || sources.open || get('person-editor').open || publish.open) return;
+  if (event.key !== 'Escape' || get('person-editor').open || publish.open) return;
   if (mobile.matches && panel.classList.contains('open')) {
     togglePanel(false);
     showPanel.focus();
