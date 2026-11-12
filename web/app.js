@@ -1,4 +1,4 @@
-import { createGraph, groupOf } from './graph.js';
+'use strict';
 
 const get = id => document.getElementById(id);
 const search = get('person-search');
@@ -204,10 +204,8 @@ function applyFilter(next) {
   sidebar.scrollTop = 0;
 }
 
-async function load() {
-  const response = await fetch('./data.json');
-  if (!response.ok) throw new Error('HTTP ' + response.status);
-  ({ people, relations } = await response.json());
+function load() {
+  ({ people, relations } = JSON.parse(get('family-data').textContent));
   byId = new Map(people.map(person => [person.id, person]));
   for (const person of people) {
     person.searchable = fold([person.name, ...person.sources.map(source => source.name)].join(' '));
@@ -275,8 +273,12 @@ document.addEventListener('keydown', event => {
     showPanel.focus();
   } else if (graph) select(null);
 });
-load().catch(error => {
+if (!location.hash) location.replace('#anasayfa');
+
+try {
+  load();
+} catch (error) {
   get('map-count').textContent = 'Veri yüklenemedi';
   get('graph-error').hidden = false;
   console.error(error);
-});
+}

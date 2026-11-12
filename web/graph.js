@@ -1,9 +1,11 @@
+'use strict';
+
 const colors = { t: '#285cda', v: '#168675', both: '#8244bf' };
 const edgeColors = { t: '#7799d9', v: '#78afa6', both: '#a58cc8' };
 const rad = Math.PI / 180;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-export function groupOf(person) {
+function groupOf(person) {
   return person.families.length > 1 ? 'both' : person.families[0];
 }
 
@@ -117,7 +119,7 @@ function arrange(people, relations) {
   }
 }
 
-export function createGraph(canvas, tooltip, people, relations, onSelect) {
+function createGraph(canvas, tooltip, people, relations, onSelect) {
   arrange(people, relations);
   const positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
   const context = canvas.getContext('2d');
