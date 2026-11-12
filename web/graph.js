@@ -24,7 +24,7 @@ function arrange(people, relations) {
   }
   for (const person of people) {
     const parent = person.layoutParent;
-    if (!parent) continue;
+    if (!byId.has(parent)) continue;
     const kind = edgeKinds.get(parent + '/' + person.id);
     const branch = kind ? companions : children;
     branch.get(parent).push(person.id);
@@ -88,6 +88,36 @@ function arrange(people, relations) {
   branch('v130', 327, 382, 103);
   branch('t25', 268, 353, 95);
 
+  // Records added through the editor do not have positions in the source layout.
+  const neighbors = new Map(people.map(person => [person.id, []]));
+  for (const { source, target } of relations) {
+    neighbors.get(source).push(target);
+    neighbors.get(target).push(source);
+  }
+  const unplaced = new Set(people.filter(person => !positions.has(person.id)).map(person => person.id));
+  const attached = new Map();
+  let standalone = 0;
+  while (unplaced.size) {
+    const before = unplaced.size;
+    for (const id of unplaced) {
+      const neighbor = neighbors.get(id).find(id => positions.has(id));
+      if (!neighbor) continue;
+      const anchor = positions.get(neighbor);
+      const offset = attached.get(neighbor) ?? 0;
+      const angle = Math.atan2(anchor.y, anchor.x) + offset * 1.22;
+      const distance = 74 + 12 * offset;
+      set(id, anchor.x + Math.cos(angle) * distance, anchor.y + Math.sin(angle) * distance);
+      attached.set(neighbor, offset + 1);
+      unplaced.delete(id);
+    }
+    if (unplaced.size === before) {
+      const id = unplaced.values().next().value;
+      set(id, -560 + (standalone % 8) * 95, -470 - Math.floor(standalone / 8) * 88);
+      standalone++;
+      unplaced.delete(id);
+    }
+  }
+
   // Keep the main branches in place while separating nearby leaf nodes.
   const all = [...positions.values()];
   for (let pass = 0; pass < 65; pass++) {
@@ -112,7 +142,6 @@ function arrange(people, relations) {
   }
 
   for (const person of people) {
-    if (!positions.has(person.id)) throw new Error('Eksik ağ konumu: ' + person.id);
     const point = positions.get(person.id);
     person.x = point.x * 1.24;
     person.y = point.y;
@@ -121,9 +150,9 @@ function arrange(people, relations) {
 
 function createGraph(canvas, tooltip, people, relations, onSelect) {
   arrange(people, relations);
-  const positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
+  let positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
   const context = canvas.getContext('2d');
-  const byId = new Map(people.map(person => [person.id, person]));
+  let byId = new Map(people.map(person => [person.id, person]));
   let currentPeople = people;
   let currentRelations = relations;
   let width = 0;
@@ -176,7 +205,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const ux = dx / distance;
       const uy = dy / distance;
       const end = { x: b.x - ux * b.r, y: b.y - uy * b.r };
-      const group = edge.families.length > 1 ? 'both' : edge.families[0];
+      const group = edge.families.length === 1 ? edge.families[0] : 'both';
       const isParent = edge.kind === 'parent';
       const color = { spouse: '#9462c5', step: '#a36c33', unclear: '#7b8492' }[edge.kind]
         || (active ? colors[group] : edgeColors[group]);
@@ -310,6 +339,14 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     moveTo({ x: width / 2 - (minX + maxX) * scale / 2, y: height / 2 - (minY + maxY) * scale / 2, scale }, animate);
   }
 
+  function orientPositions() {
+    for (const person of people) {
+      const { x, y } = positions.get(person.id);
+      person.x = portrait ? y : x;
+      person.y = portrait ? -x : y;
+    }
+  }
+
   function resize() {
     const bounds = canvas.getBoundingClientRect();
     const nextRatio = Math.min(devicePixelRatio || 1, 3);
@@ -323,11 +360,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     const nextPortrait = width < 560 && height > width * 1.2;
     if (portrait !== nextPortrait) {
       portrait = nextPortrait;
-      for (const person of people) {
-        const { x, y } = positions.get(person.id);
-        person.x = portrait ? y : x;
-        person.y = portrait ? -x : y;
-      }
+      orientPositions();
       fitted = true;
     }
     canvas.width = Math.round(width * ratio);
@@ -448,11 +481,19 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
   resize();
 
   return {
+    replace(nextPeople, nextRelations) {
+      arrange(nextPeople, nextRelations);
+      people = nextPeople;
+      byId = new Map(people.map(person => [person.id, person]));
+      positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
+      orientPositions();
+    },
     filter(visiblePeople, visibleRelations) {
       currentPeople = visiblePeople;
       currentRelations = visibleRelations;
       hideTooltip();
       fit();
+      frame();
     },
     select(id) {
       selected = id;

@@ -38,6 +38,8 @@ h1, h2, h3, p { margin: 0; }
 .local-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--v); }
 .plain-button { background: white; border: 1px solid var(--hairline); border-radius: 8px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; white-space: nowrap; }
 .plain-button:hover { background: #f1f5fa; }
+.primary-button { color: white; background: #2856bb; border-color: #2856bb; }
+.primary-button:hover { background: #1e449d; border-color: #1e449d; }
 .workspace { height: calc(100dvh - 71px); display: grid; grid-template-columns: 296px minmax(0, 1fr); }
 .people-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--hairline); background: var(--panel); }
 .sidebar-head { padding: 25px 21px 18px; }
@@ -68,7 +70,8 @@ h1, h2, h3, p { margin: 0; }
 .detail-title { font-size: 24px; line-height: 1.13; letter-spacing: -.045em; margin: 8px 0 6px; }
 .detail .person-avatar { width: 39px; height: 39px; font-size: 12px; }
 .detail-summary { font-size: 13px; color: var(--muted); }
-.detail .plain-button { margin: 14px 0; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
+.detail-actions .plain-button { padding-inline: 9px; }
 .detail-group { border-top: 1px solid var(--hairline); padding-top: 11px; margin-top: 2px; }
 .detail-group h4 { font-size: 12px; margin: 0 0 5px; font-weight: 700; }
 .detail .person-button { padding: 6px 2px; }
@@ -127,6 +130,26 @@ dialog::backdrop { background: #1625365e; }
 .dialog-head { display: flex; justify-content: space-between; align-items: center; }
 .dialog-head h2 { font-size: 22px; letter-spacing: -.04em; }
 dialog p { color: var(--muted); font-size: 13px; margin-top: 14px; line-height: 1.6; }
+#person-editor { width: min(590px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto; }
+.editor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 17px; }
+.editor-fields label, .editor-link label { display: grid; gap: 5px; font-size: 12px; font-weight: 700; min-width: 0; }
+.editor-fields input, .editor-fields select, .editor-link select {
+  border: 1px solid #dce4ec; border-radius: 7px; background: white; color: var(--ink);
+  font: inherit; font-size: 13px; font-weight: 500; padding: 8px; min-width: 0; width: 100%;
+}
+.editor-fields input:focus, .editor-fields select:focus, .editor-link select:focus { outline: 2px solid var(--t); outline-offset: 1px; }
+.editor-relations { border: 0; border-top: 1px solid var(--hairline); margin: 18px 0 0; padding: 8px 0 0; min-width: 0; }
+.editor-relations legend { padding: 0 7px 0 0; font-size: 13px; font-weight: 700; }
+.editor-link { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto; align-items: end; gap: 7px; margin-bottom: 9px; }
+.editor-link .icon-button { height: 35px; }
+.editor-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; border-top: 1px solid var(--hairline); margin-top: 16px; padding-top: 12px; }
+.editor-actions p { margin: 0 auto 0 0; font-size: 12px; }
+dialog p.editor-error { color: #a02128; font-weight: 650; }
+.publish-data { width: 100%; height: 88px; margin-top: 10px; resize: vertical; border: 1px solid var(--hairline); border-radius: 7px; padding: 8px; font: 12px ui-monospace, monospace; }
+#publish-content a { text-decoration: none; }
+#show-publish { margin-left: auto; padding: 4px 8px; }
+#save-status:empty { display: none; }
+#save-status:not(:empty) + #map-instruction { display: none; }
 .source-links { list-style: none; padding: 0; margin: 12px 0 0; }
 .source-links li { border-bottom: 1px solid var(--hairline); padding: 9px 0; font-size: 14px; font-weight: 650; }
 
@@ -137,6 +160,8 @@ dialog p { color: var(--muted); font-size: 13px; margin-top: 14px; line-height: 
 }
 @media(max-width: 690px) {
   .masthead { height: 59px; padding-inline: 13px; }
+  .mast-actions { gap: 5px; }
+  .mast-actions .plain-button { padding-inline: 8px; }
   .network-mark { transform: scale(.9); margin-left: -2px; }
   .identity { gap: 7px; }
   .identity h1 { font-size: 17px; }
@@ -161,6 +186,10 @@ dialog p { color: var(--muted); font-size: 13px; margin-top: 14px; line-height: 
   .map-foot { padding: 7px 10px; font-size: 10px; }
 }
 @media(max-width: 359px) {
+  .masthead { padding-inline: 8px; }
+  .mast-actions .plain-button { padding-inline: 6px; font-size: 12px; }
+  #person-editor { padding: 15px; }
+  .editor-fields { grid-template-columns: minmax(0, 1fr); }
   .filters button { gap: 3px; padding-inline: 5px; }
   #show-panel .search-icon { display: none; }
 }

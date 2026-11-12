@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Soy Ağacı · Tunçgenç &amp; Veryeri</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./style.css">
-  <script src="./graph.js" defer></script>
-  <script src="./app.js" defer></script>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script src="./graph.js?v=2" defer></script>
+  <script src="./editor.js?v=2" defer></script>
+  <script src="./app.js?v=2" defer></script>
 </head>
 <body id="anasayfa">
   <header class="masthead">
@@ -22,7 +23,8 @@
       </div>
     </div>
     <div class="mast-actions">
-        <button id="show-sources" class="plain-button" type="button">Kaynaklar</button>
+      <button id="show-sources" class="plain-button" type="button">Kaynaklar</button>
+      <button id="add-person" class="plain-button primary-button" type="button" disabled>Kişi ekle</button>
     </div>
   </header>
 
@@ -73,7 +75,7 @@
           <div class="legend-body">
             <span><i class="dot tun"></i>Tunçgenç</span>
             <span><i class="dot ver"></i>Veryeri</span>
-            <span><i class="dot both"></i>İki tabloda ortak</span>
+            <span><i class="dot both"></i>İki aile kolunda</span>
             <span><i class="line parent"></i>Üst kuşak → alt kuşak</span>
             <span><i class="line spouse"></i>Eş</span>
             <span><i class="line step"></i>Üvey bağı</span>
@@ -87,11 +89,69 @@
         </div>
       </div>
       <footer class="map-foot">
-        <span>Düğüme dokunarak kişiyi, çizgileri izleyerek bağlarını keşfet.</span>
+        <span id="save-status" role="status"></span>
+        <span id="map-instruction">Düğüme dokunarak kişiyi, çizgileri izleyerek bağlarını keşfet.</span>
+        <button id="show-publish" class="plain-button" type="button" hidden>GitHub’da yayımla</button>
         <span class="desktop-hint">Sürükle <b>·</b> Yakınlaştır <b>·</b> Seç</span>
       </footer>
     </section>
   </main>
+
+  <dialog id="person-editor" aria-labelledby="editor-title">
+    <div class="dialog-head">
+      <h2 id="editor-title">Kişi ekle</h2>
+      <button class="icon-button" id="close-editor" type="button" aria-label="Formu kapat">×</button>
+    </div>
+    <form id="editor-form">
+      <div class="editor-fields">
+        <label>Ad ve soyad
+          <input name="name" maxlength="120" autocomplete="off" required>
+        </label>
+        <label>Aile kolu
+          <select name="family" required>
+            <option value="">Aile kolu seç</option>
+            <option value="t">Tunçgenç</option>
+            <option value="v">Veryeri</option>
+            <option value="both">Tunçgenç ve Veryeri</option>
+          </select>
+        </label>
+        <label>Doğum tarihi
+          <input name="birth" maxlength="10" autocomplete="off" placeholder="GG.AA.YYYY veya YYYY">
+        </label>
+        <label>Ölüm tarihi
+          <input name="death" maxlength="10" autocomplete="off" placeholder="GG.AA.YYYY veya YYYY">
+        </label>
+      </div>
+      <p id="editor-date-note" hidden></p>
+      <fieldset class="editor-relations">
+        <legend>Akrabalık bağları</legend>
+        <div id="editor-links"></div>
+        <button id="add-link" class="plain-button" type="button">Bağ ekle</button>
+      </fieldset>
+      <p id="editor-error" class="editor-error" role="alert" hidden></p>
+      <div class="editor-actions">
+        <p>Önce bu tarayıcıda taslak olarak kaydedilir.</p>
+        <button id="cancel-editor" class="plain-button" type="button">Vazgeç</button>
+        <button class="plain-button primary-button" type="submit">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="publish-editor" aria-labelledby="publish-title">
+    <div class="dialog-head">
+      <h2 id="publish-title">GitHub’da yayımla</h2>
+      <button class="icon-button" id="close-publish" type="button" aria-label="Yayın penceresini kapat">×</button>
+    </div>
+    <p id="publish-status" role="status"></p>
+    <div id="publish-content" hidden>
+      <p>Veriyi kopyala. GitHub düzenleyicisinde mevcut dosyanın tamamını seçip yerine yapıştır. Ardından <strong>Commit changes</strong> ile kaydet.</p>
+      <textarea id="publish-data" class="publish-data" readonly aria-label="Yayımlanacak soy ağacı verisi"></textarea>
+      <div class="editor-actions">
+        <button id="copy-publish-data" class="plain-button" type="button">Veriyi kopyala</button>
+        <a class="plain-button primary-button" href="https://github.com/0x5864/SoyAgaci/edit/main/web/data.json" target="_blank" rel="noreferrer">GitHub düzenleyicisini aç</a>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="sources">
     <div class="dialog-head">
