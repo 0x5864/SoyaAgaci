@@ -2,8 +2,10 @@
 
 const draftKey = 'SoyAgaci.draft.v1';
 const editableDates = ['birth', 'death'];
+const parentRoles = ['mother', 'father'];
 const relationshipOptions = [
-  ['upper', 'Üst kuşak'], ['lower', 'Alt kuşak'], ['spouse', 'Eş'],
+  ['upper', 'Ebeveyn (rol belirsiz)'], ['lower', 'Çocuk (rol belirsiz)'],
+  ['mother-child', 'Çocuk (annesi bu kişi)'], ['father-child', 'Çocuk (babası bu kişi)'], ['spouse', 'Eş'],
   ['step', 'Üvey bağı'], ['unclear', 'Bağ türü belirsiz'],
 ];
 
@@ -38,6 +40,13 @@ function relationshipKey(edge) {
   return [edge.kind, ...endpoints].join('/');
 }
 
+function inheritParentRole(record, current) {
+  if (record?.kind === 'parent' && !Object.hasOwn(record, 'role') && current?.role) {
+    return { ...record, role: current.role };
+  }
+  return record;
+}
+
 function sameRecord(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
@@ -65,11 +74,12 @@ function applyDraft(base, draft, allowConflicts = false) {
     const indexed = new Map(records.map(record => [keyFor(record), record]));
     for (const { key, before, after } of changes) {
       const current = indexed.get(key);
-      if (sameRecord(current, after)) continue;
-      if (!allowConflicts && !sameRecord(current, before)) {
+      const replacement = inheritParentRole(after, current);
+      if (sameRecord(current, replacement)) continue;
+      if (!allowConflicts && !sameRecord(current, inheritParentRole(before, current))) {
         throw new Error('Bu kayıt GitHub’da da değişmiş. Yayımlamadan önce iki sürümdeki değişiklikleri birleştir.');
       }
-      if (after) indexed.set(key, after);
+      if (replacement) indexed.set(key, replacement);
       else indexed.delete(key);
     }
     return [...indexed.values()];
@@ -84,6 +94,7 @@ function applyDraft(base, draft, allowConflicts = false) {
   if (!allowConflicts && addsParentCycle(relations, added)) {
     throw new Error('Taslak ile GitHub’daki bağlar bir kuşak döngüsü oluşturuyor.');
   }
+  if (!allowConflicts) validateParentRoles(relations);
   return { people, relations };
 }
 
@@ -110,9 +121,18 @@ function addsParentCycle(nextEdges, added) {
   });
 }
 
+function validateParentRoles(relations) {
+  const assigned = new Set();
+  for (const edge of relations) {
+    if (edge.kind !== 'parent' || !parentRoles.includes(edge.role)) continue;
+    const key = edge.target + '/' + edge.role;
+    if (assigned.has(key)) throw new Error('Bir kişi için yalnızca bir anne ve bir baba seçilebilir.');
+    assigned.add(key);
+  }
+}
+
 function changePerson(data, updated, nextLinks) {
   const people = new Map(data.people.map(person => [person.id, person]));
-  const previous = people.get(updated.id);
   people.set(updated.id, updated);
   const incident = edge => edge.source === updated.id || edge.target === updated.id;
   const originalLinks = new Map(data.relations.filter(incident).map(edge => [relationshipKey(edge), edge]));
@@ -121,15 +141,10 @@ function changePerson(data, updated, nextLinks) {
     const key = relationshipKey(link);
     if (kept.has(key)) throw new Error('Aynı akrabalık bağı birden fazla kez eklenmiş.');
     const original = originalLinks.get(key);
-    const sameFamily = sameRecord(updated.families, previous?.families);
-    if (original && sameFamily) {
-      kept.set(key, original);
-      continue;
-    }
     const other = people.get(link.source === updated.id ? link.target : link.source);
     if (!other || other.id === updated.id) throw new Error('Akrabalık bağı için başka bir kişi seç.');
-    const families = updated.families.filter(family => other.families.includes(family));
-    kept.set(key, original ? { ...original, families } : { ...link, families });
+    if (original && (original.role ?? null) === (link.role ?? null)) kept.set(key, original);
+    else kept.set(key, original ? { ...original, role: link.role } : link);
   }
   const remaining = data.relations.flatMap(edge => {
     if (!incident(edge)) return [edge];
@@ -142,8 +157,9 @@ function changePerson(data, updated, nextLinks) {
   const added = [...kept.values()];
   const relations = [...remaining, ...added];
   if (addsParentCycle(relations, added)) {
-    throw new Error('Üst ve alt kuşak bağları döngü oluşturuyor. Bağların yönünü kontrol et.');
+    throw new Error('Ebeveyn ve çocuk bağları döngü oluşturuyor. Bağların yönünü kontrol et.');
   }
+  validateParentRoles(relations);
   return { people: [...people.values()], relations };
 }
 
@@ -157,13 +173,17 @@ function createPersonEditor(onSave) {
   let options = [];
   let initialDates;
 
+  function fillPersonSelect(select, placeholder) {
+    select.replaceChildren(new Option(placeholder, ''));
+    for (const option of options) select.append(new Option(option.label, option.id));
+  }
+
   function addLinkRow(edge) {
     const row = make('div', 'editor-link');
     const personLabel = make('label', '', 'Kişi');
     const peer = make('select');
     peer.dataset.peer = '';
-    peer.append(new Option('Kişi seç', ''));
-    for (const option of options) peer.append(new Option(option.label, option.id));
+    fillPersonSelect(peer, 'Kişi seç');
     personLabel.append(peer);
 
     const typeLabel = make('label', '', 'Bağ');
@@ -176,7 +196,9 @@ function createPersonEditor(onSave) {
     if (edge) {
       const outgoing = edge.source === person.id;
       peer.value = outgoing ? edge.target : edge.source;
-      type.value = edge.kind === 'parent' ? (outgoing ? 'lower' : 'upper') : edge.kind;
+      type.value = edge.kind === 'parent'
+        ? (outgoing ? (edge.role ? edge.role + '-child' : 'lower') : 'upper')
+        : edge.kind;
     }
     const remove = make('button', 'icon-button', '×');
     remove.type = 'button';
@@ -200,11 +222,8 @@ function createPersonEditor(onSave) {
     try {
       const name = fields.namedItem('name').value.trim();
       if (!name) throw new Error('Ad ve soyad alanını doldur.');
-      const family = fields.namedItem('family').value;
-      if (!['t', 'v'].includes(family)) throw new Error('Aile kolunu seç.');
-      const families = person && groupOf(person) === family ? person.families : [family];
       const id = person?.id ?? 'user-' + crypto.randomUUID();
-      const updated = { ...(person ?? { id, sources: [] }), name, families };
+      const updated = { ...(person ?? { id, sources: [] }), name };
       if (!person?.unnamed || name !== person.name) delete updated.unnamed;
       const dates = { ...person?.dates };
       let datesChanged = false;
@@ -222,18 +241,29 @@ function createPersonEditor(onSave) {
           throw new Error('Ölüm tarihi doğum tarihinden önce olamaz.');
         }
       }
-      const links = [...rows.children].flatMap(row => {
+      const parents = parentRoles.flatMap(role => {
+        const source = fields.namedItem(role).value;
+        return source ? [{ source, target: id, kind: 'parent', role }] : [];
+      });
+      if (parents.length === 2 && parents[0].source === parents[1].source) {
+        throw new Error('Anne ve baba için farklı kişiler seç.');
+      }
+      const otherLinks = [...rows.children].flatMap(row => {
         const peer = row.querySelector('[data-peer]').value;
         const type = row.querySelector('[data-kind]').value;
         if (!peer && !type) return [];
         if (!peer || !type) throw new Error('Her akrabalık bağı için kişi ve bağ türünü seç.');
-        return [{
-          source: type === 'upper' ? peer : id,
-          target: type === 'upper' ? id : peer,
-          kind: type === 'upper' || type === 'lower' ? 'parent' : type,
-        }];
+        if (type === 'upper') {
+          if (parents.some(edge => edge.source === peer)) return [];
+          return [{ source: peer, target: id, kind: 'parent', role: null }];
+        }
+        if (type === 'lower' || type.endsWith('-child')) {
+          const role = type === 'lower' ? null : type.replace('-child', '');
+          return [{ source: id, target: peer, kind: 'parent', role }];
+        }
+        return [{ source: id, target: peer, kind: type }];
       });
-      onSave(updated, links);
+      onSave(updated, [...parents, ...otherLinks]);
       dialog.close();
       detail.querySelector('h3')?.focus();
     } catch (failure) {
@@ -242,14 +272,13 @@ function createPersonEditor(onSave) {
     }
   });
 
-  return function open(data, record, filter) {
+  return function open(data, record) {
     person = record;
     form.reset();
     rows.replaceChildren();
     error.hidden = true;
     get('editor-title').textContent = person ? 'Kişiyi düzenle' : 'Kişi ekle';
     fields.namedItem('name').value = person?.name ?? '';
-    fields.namedItem('family').value = person ? groupOf(person) : filter === 'all' ? '' : filter;
     initialDates = {};
     const conflicts = [];
     for (const field of editableDates) {
@@ -269,8 +298,13 @@ function createPersonEditor(onSave) {
         id: candidate.id,
         label: [candidate.name, years(candidate) || candidate.sources[0]?.cell].filter(Boolean).join(' · '),
       }));
+    for (const role of parentRoles) fillPersonSelect(fields.namedItem(role), 'Belirtilmemiş');
     if (person) {
       for (const edge of data.relations) {
+        if (edge.kind === 'parent' && edge.target === person.id && parentRoles.includes(edge.role)) {
+          fields.namedItem(edge.role).value = edge.source;
+          continue;
+        }
         if (edge.source === person.id || edge.target === person.id) addLinkRow(edge);
       }
     }

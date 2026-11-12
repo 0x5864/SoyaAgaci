@@ -1,35 +1,34 @@
 'use strict';
 
-const colors = { t: '#285cda', v: '#168675' };
-const edgeColors = { t: '#7799d9', v: '#78afa6', cross: '#8b98a7' };
+const nodeColor = '#36516c';
+const parentColors = { mother: '#a84381', father: '#3568bd' };
+const otherEdgeColors = { spouse: '#9462c5', step: '#a36c33', unclear: '#7b8492' };
 const rad = Math.PI / 180;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-function groupOf(person) {
-  // Şerife's Veryeri ancestry connects the two source tables.
-  if (person.id === 'v130' && person.families.length > 1) return 'v';
-  return person.families.includes('t') ? 't' : 'v';
-}
 
 function arrange(people, relations) {
   const byId = new Map(people.map(person => [person.id, person]));
   const children = new Map(people.map(person => [person.id, []]));
   const companions = new Map(people.map(person => [person.id, []]));
   const positions = new Map();
-  const edgeKinds = new Map();
-  for (const edge of relations) {
-    const kind = edge.kind;
+  const parents = new Map(people.map(person => [person.id, []]));
+  const companionLinks = new Set();
+  for (const { source, target, kind } of relations) {
+    if (kind === 'parent') parents.get(target).push(source);
     if (kind === 'spouse' || kind === 'unclear') {
-      edgeKinds.set(edge.source + '/' + edge.target, kind);
-      edgeKinds.set(edge.target + '/' + edge.source, kind);
+      companionLinks.add(source + '/' + target);
+      companionLinks.add(target + '/' + source);
     }
   }
   for (const person of people) {
-    const parent = person.layoutParent;
-    if (!byId.has(parent)) continue;
-    const kind = edgeKinds.get(parent + '/' + person.id);
-    const branch = kind ? companions : children;
-    branch.get(parent).push(person.id);
+    const parentIds = parents.get(person.id);
+    const anchor = person.layoutParent;
+    if (parentIds.length) {
+      const parent = parentIds.includes(anchor) ? anchor : parentIds[0];
+      children.get(parent).push(person.id);
+    } else if (companionLinks.has(anchor + '/' + person.id)) {
+      companions.get(anchor).push(person.id);
+    }
   }
 
   const weights = new Map();
@@ -207,11 +206,8 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const ux = dx / distance;
       const uy = dy / distance;
       const end = { x: b.x - ux * b.r, y: b.y - uy * b.r };
-      const sourceFamily = groupOf(byId.get(edge.source));
-      const group = sourceFamily === groupOf(byId.get(edge.target)) ? sourceFamily : 'cross';
       const isParent = edge.kind === 'parent';
-      const color = { spouse: '#9462c5', step: '#a36c33', unclear: '#7b8492' }[edge.kind]
-        || (active ? colors[group] ?? edgeColors[group] : edgeColors[group]);
+      const color = isParent ? parentColors[edge.role] ?? '#79899a' : otherEdgeColors[edge.kind];
       context.globalAlpha = selected ? (active ? .94 : .15) : .83;
       context.strokeStyle = color;
       context.lineWidth = active ? 1.55 : 1;
@@ -234,20 +230,19 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
 
     for (const person of currentPeople) {
       const { x, y, r } = points.get(person.id);
-      const color = colors[groupOf(person)];
       const focused = selected === person.id || hover === person.id;
       context.globalAlpha = selected && !neighbors.has(person.id) && !focused ? .22 : 1;
       if (focused || rank.has(person.id)) {
-        context.fillStyle = color + (focused ? '27' : '14');
+        context.fillStyle = nodeColor + (focused ? '27' : '14');
         context.beginPath();
         context.arc(x, y, r + (focused ? 7 : 4), 0, Math.PI * 2);
         context.fill();
       }
       context.beginPath();
       context.arc(x, y, r, 0, Math.PI * 2);
-      context.fillStyle = person.unnamed ? '#fff' : color;
+      context.fillStyle = person.unnamed ? '#fff' : nodeColor;
       context.fill();
-      context.strokeStyle = person.unnamed ? color : '#fff';
+      context.strokeStyle = person.unnamed ? nodeColor : '#fff';
       context.lineWidth = 1;
       context.stroke();
     }
@@ -293,7 +288,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
         context.lineWidth = 3.5;
         context.lineJoin = 'round';
         context.strokeStyle = '#fcfdff';
-        context.fillStyle = main || focus ? colors[groupOf(person)] : '#40546a';
+        context.fillStyle = main || focus ? nodeColor : '#40546a';
         context.strokeText(name, x + ox, y + oy);
         context.fillText(name, x + ox, y + oy);
         break;

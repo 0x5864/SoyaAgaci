@@ -11,7 +11,6 @@ const sources = get('sources');
 const sidebar = get('sidebar-scroll');
 const mobile = matchMedia('(max-width: 690px)');
 const names = { t: 'Tunçgenç', v: 'Veryeri' };
-const classes = { t: 'tun', v: 'ver' };
 const sortNames = new Intl.Collator('tr');
 let filter = 'all';
 let selected = null;
@@ -47,14 +46,10 @@ function years(person) {
   return birth && death ? birth + '–' + death : birth ? 'd. ' + birth : death ? 'ö. ' + death : '';
 }
 
-function personSummary(person) {
-  return [names[groupOf(person)], years(person)].filter(Boolean).join(' · ');
-}
-
 function avatar(person) {
   const initials = person.name.replace(/\s*\([^)]+\)/g, '').split(/\s+/);
   const label = person.unnamed ? '?' : initials.length > 1 ? initials[0][0] + initials.at(-1)[0] : initials[0].slice(0, 2);
-  const element = make('span', 'person-avatar ' + classes[groupOf(person)], label.toLocaleUpperCase('tr'));
+  const element = make('span', 'person-avatar', label.toLocaleUpperCase('tr'));
   element.setAttribute('aria-hidden', 'true');
   return element;
 }
@@ -64,7 +59,9 @@ function personButton(person) {
   button.type = 'button';
   button.dataset.person = person.id;
   const info = make('span');
-  info.append(make('span', 'person-name', person.name), make('span', 'person-meta', personSummary(person)));
+  info.append(make('span', 'person-name', person.name));
+  const dates = years(person);
+  if (dates) info.append(make('span', 'person-meta', dates));
   const arrow = make('span', 'person-arrow', '›');
   arrow.setAttribute('aria-hidden', 'true');
   button.append(avatar(person), info, arrow);
@@ -137,14 +134,18 @@ function renderDetails() {
   edit.dataset.action = 'edit';
   const actions = make('div', 'detail-actions');
   actions.append(edit, focus);
-  card.append(back, avatar(person), title, make('p', 'detail-summary', personSummary(person)), actions);
+  card.append(back, avatar(person), title);
+  const dates = years(person);
+  if (dates) card.append(make('p', 'detail-summary', dates));
+  card.append(actions);
 
-  const groupLabels = ['Üst kuşak', 'Eş', 'Alt kuşak', 'Üvey bağı', 'Bağ türü belirsiz'];
+  const groupLabels = ['Anne', 'Baba', 'Ebeveyn (rol belirsiz)', 'Eş', 'Çocuklar', 'Üvey bağı', 'Bağ türü belirsiz'];
   const groups = new Map(groupLabels.map(label => [label, new Set()]));
-  for (const edge of visibleRelations) {
+  for (const edge of relations) {
     if (edge.source !== selected && edge.target !== selected) continue;
     const outgoing = edge.source === selected;
-    const label = edge.kind === 'parent' ? (outgoing ? 'Alt kuşak' : 'Üst kuşak')
+    const parentLabel = edge.role === 'mother' ? 'Anne' : edge.role === 'father' ? 'Baba' : 'Ebeveyn (rol belirsiz)';
+    const label = edge.kind === 'parent' ? (outgoing ? 'Çocuklar' : parentLabel)
       : ({ spouse: 'Eş', step: 'Üvey bağı', unclear: 'Bağ türü belirsiz' })[edge.kind];
     groups.get(label).add(outgoing ? edge.target : edge.source);
   }
@@ -186,6 +187,7 @@ function togglePanel(open, focusSearch = false) {
 }
 
 function select(id, focusDetails = false) {
+  if (id && filter !== 'all' && !visiblePeople.some(person => person.id === id)) applyFilter('all');
   selected = id;
   graph.select(id);
   renderDetails();
@@ -198,10 +200,10 @@ function select(id, focusDetails = false) {
 
 function applyFilter(next) {
   filter = next;
-  visiblePeople = people.filter(person => filter === 'all' || groupOf(person) === filter);
-  const visibleIds = new Set(visiblePeople.map(person => person.id));
   visibleRelations = filter === 'all' ? relations : relations.filter(edge =>
-    visibleIds.has(edge.source) && visibleIds.has(edge.target));
+    edge.kind === 'parent' && edge.role === filter);
+  const visibleIds = new Set(visibleRelations.flatMap(edge => [edge.source, edge.target]));
+  visiblePeople = filter === 'all' ? people : people.filter(person => visibleIds.has(person.id));
   for (const person of visiblePeople) person.visibleDegree = 0;
   for (const edge of visibleRelations) {
     byId.get(edge.source).visibleDegree++;
@@ -269,7 +271,6 @@ function savePerson(person, links) {
   }
   storedDraft = serialized;
   draft = nextDraft;
-  if (filter !== 'all' && groupOf(person) !== filter) filter = 'all';
   displayData(next);
   select(person.id);
   updateDraftStatus();
@@ -350,7 +351,7 @@ async function load() {
   const openEditor = createPersonEditor(savePerson);
   const addPerson = get('add-person');
   addPerson.disabled = false;
-  addPerson.addEventListener('click', () => openEditor(activeData, null, filter));
+  addPerson.addEventListener('click', () => openEditor(activeData, null));
 
   get('filters').addEventListener('click', event => {
     const button = event.target.closest('[data-filter]');
@@ -361,7 +362,7 @@ async function load() {
     if (!button) return;
     if (button.dataset.person) select(button.dataset.person, true);
     if (button.dataset.action === 'edit') {
-      openEditor(activeData, activeData.people.find(person => person.id === selected), filter);
+      openEditor(activeData, activeData.people.find(person => person.id === selected));
     }
     if (button.dataset.action === 'back') {
       select(null);
