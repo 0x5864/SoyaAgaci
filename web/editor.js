@@ -201,9 +201,8 @@ function createPersonEditor(onSave) {
       const name = fields.namedItem('name').value.trim();
       if (!name) throw new Error('Ad ve soyad alanını doldur.');
       const family = fields.namedItem('family').value;
-      if (!family) throw new Error('Aile kolunu seç.');
-      const families = person && groupOf(person) === family ? person.families
-        : family === 'both' ? ['t', 'v'] : [family];
+      if (!['t', 'v'].includes(family)) throw new Error('Aile kolunu seç.');
+      const families = person && groupOf(person) === family ? person.families : [family];
       const id = person?.id ?? 'user-' + crypto.randomUUID();
       const updated = { ...(person ?? { id, sources: [] }), name, families };
       if (!person?.unnamed || name !== person.name) delete updated.unnamed;

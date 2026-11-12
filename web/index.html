@@ -8,10 +8,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Soy Ağacı · Tunçgenç &amp; Veryeri</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./style.css?v=2">
-  <script src="./graph.js?v=2" defer></script>
-  <script src="./editor.js?v=2" defer></script>
-  <script src="./app.js?v=2" defer></script>
+  <link rel="stylesheet" href="./style.css?v=3">
+  <script src="./graph.js?v=3" defer></script>
+  <script src="./editor.js?v=3" defer></script>
+  <script src="./app.js?v=3" defer></script>
 </head>
 <body id="anasayfa">
   <header class="masthead">
@@ -71,11 +71,10 @@
         <div id="tooltip" class="tooltip" hidden></div>
         <p id="graph-error" class="empty graph-error" hidden>Yerel soy ağacı verisi açılamadı.</p>
         <details class="legend">
-          <summary><span>Gösterge</span><span class="legend-dots" aria-hidden="true"><i class="dot tun"></i><i class="dot ver"></i><i class="dot both"></i></span></summary>
+          <summary><span>Gösterge</span><span class="legend-dots" aria-hidden="true"><i class="dot tun"></i><i class="dot ver"></i></span></summary>
           <div class="legend-body">
             <span><i class="dot tun"></i>Tunçgenç</span>
             <span><i class="dot ver"></i>Veryeri</span>
-            <span><i class="dot both"></i>İki aile kolunda</span>
             <span><i class="line parent"></i>Üst kuşak → alt kuşak</span>
             <span><i class="line spouse"></i>Eş</span>
             <span><i class="line step"></i>Üvey bağı</span>
@@ -112,7 +111,6 @@
             <option value="">Aile kolu seç</option>
             <option value="t">Tunçgenç</option>
             <option value="v">Veryeri</option>
-            <option value="both">Tunçgenç ve Veryeri</option>
           </select>
         </label>
         <label>Doğum tarihi

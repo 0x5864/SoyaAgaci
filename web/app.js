@@ -10,8 +10,8 @@ const list = get('people-list');
 const sources = get('sources');
 const sidebar = get('sidebar-scroll');
 const mobile = matchMedia('(max-width: 690px)');
-const names = { t: 'Tunçgenç', v: 'Veryeri', both: 'Tunçgenç · Veryeri' };
-const classes = { t: 'tun', v: 'ver', both: 'both' };
+const names = { t: 'Tunçgenç', v: 'Veryeri' };
+const classes = { t: 'tun', v: 'ver' };
 const sortNames = new Intl.Collator('tr');
 let filter = 'all';
 let selected = null;
@@ -198,10 +198,10 @@ function select(id, focusDetails = false) {
 
 function applyFilter(next) {
   filter = next;
-  visiblePeople = people.filter(person => filter === 'all' || person.families.includes(filter));
+  visiblePeople = people.filter(person => filter === 'all' || groupOf(person) === filter);
   const visibleIds = new Set(visiblePeople.map(person => person.id));
   visibleRelations = filter === 'all' ? relations : relations.filter(edge =>
-    edge.families.includes(filter) && visibleIds.has(edge.source) && visibleIds.has(edge.target));
+    visibleIds.has(edge.source) && visibleIds.has(edge.target));
   for (const person of visiblePeople) person.visibleDegree = 0;
   for (const edge of visibleRelations) {
     byId.get(edge.source).visibleDegree++;
@@ -269,7 +269,7 @@ function savePerson(person, links) {
   }
   storedDraft = serialized;
   draft = nextDraft;
-  if (filter !== 'all' && !person.families.includes(filter)) filter = 'all';
+  if (filter !== 'all' && groupOf(person) !== filter) filter = 'all';
   displayData(next);
   select(person.id);
   updateDraftStatus();

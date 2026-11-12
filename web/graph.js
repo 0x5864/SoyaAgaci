@@ -1,12 +1,14 @@
 'use strict';
 
-const colors = { t: '#285cda', v: '#168675', both: '#8244bf' };
-const edgeColors = { t: '#7799d9', v: '#78afa6', both: '#a58cc8' };
+const colors = { t: '#285cda', v: '#168675' };
+const edgeColors = { t: '#7799d9', v: '#78afa6', cross: '#8b98a7' };
 const rad = Math.PI / 180;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 function groupOf(person) {
-  return person.families.length > 1 ? 'both' : person.families[0];
+  // Şerife's Veryeri ancestry connects the two source tables.
+  if (person.id === 'v130' && person.families.length > 1) return 'v';
+  return person.families.includes('t') ? 't' : 'v';
 }
 
 function arrange(people, relations) {
@@ -205,10 +207,11 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const ux = dx / distance;
       const uy = dy / distance;
       const end = { x: b.x - ux * b.r, y: b.y - uy * b.r };
-      const group = edge.families.length === 1 ? edge.families[0] : 'both';
+      const sourceFamily = groupOf(byId.get(edge.source));
+      const group = sourceFamily === groupOf(byId.get(edge.target)) ? sourceFamily : 'cross';
       const isParent = edge.kind === 'parent';
       const color = { spouse: '#9462c5', step: '#a36c33', unclear: '#7b8492' }[edge.kind]
-        || (active ? colors[group] : edgeColors[group]);
+        || (active ? colors[group] ?? edgeColors[group] : edgeColors[group]);
       context.globalAlpha = selected ? (active ? .94 : .15) : .83;
       context.strokeStyle = color;
       context.lineWidth = active ? 1.55 : 1;
