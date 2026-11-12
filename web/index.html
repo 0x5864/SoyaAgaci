@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Soy Ağacı · Tunçgenç &amp; Veryeri</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" type="module"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="identity">
+      <span class="network-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div>
+        <h1>Soy Ağacı</h1>
+        <p>Tunçgenç &amp; Veryeri</p>
+      </div>
+    </div>
+    <div class="mast-actions">
+        <button id="show-sources" class="plain-button" type="button">Kaynaklar</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside id="people-panel" class="people-panel" aria-label="Kişiler ve ayrıntılar">
+      <div class="sidebar-head">
+        <div class="section-line">
+          <h2>Kişiler</h2>
+          <span class="count" id="list-count">…</span>
+          <button id="hide-panel" class="icon-button mobile-only" type="button" aria-label="Kişi panelini kapat">×</button>
+        </div>
+        <label class="search-field">
+          <span class="search-icon" aria-hidden="true"></span>
+          <input id="person-search" type="search" placeholder="Ad veya soyad ara" autocomplete="off" aria-label="Ad veya soyad ara">
+        </label>
+      </div>
+      <div class="sidebar-scroll" id="sidebar-scroll">
+        <div id="person-detail" hidden></div>
+        <div id="people-results">
+          <p class="list-heading" id="list-heading">Öne çıkan bağlantılar</p>
+          <ul class="people-list" id="people-list"></ul>
+          <p id="empty-results" class="empty" hidden>Bu aramaya uygun kişi bulunamadı.</p>
+        </div>
+      </div>
+    </aside>
+
+    <section class="map" aria-labelledby="map-title">
+      <div class="map-head">
+        <div class="map-heading">
+          <h2 id="map-title">Aile ağı</h2>
+          <p id="map-count" role="status">Soy ağacı yükleniyor…</p>
+        </div>
+        <div class="map-actions">
+          <div id="filters" class="filters" role="group" aria-label="Aile filtresi">
+            <button type="button" data-filter="all" aria-pressed="true">Tüm ağ</button>
+            <button type="button" data-filter="t" aria-pressed="false"><i class="dot tun"></i>Tunçgenç</button>
+            <button type="button" data-filter="v" aria-pressed="false"><i class="dot ver"></i>Veryeri</button>
+          </div>
+          <button id="show-panel" class="plain-button mobile-only" type="button" aria-controls="people-panel" aria-expanded="false"><i class="search-icon" aria-hidden="true"></i>Kişiler</button>
+        </div>
+      </div>
+      <div class="plot" id="plot">
+        <canvas id="network" aria-label="Etkileşimli aile ağı. Klavye ile gezinmek için Kişiler panelini kullanın."></canvas>
+        <div id="tooltip" class="tooltip" hidden></div>
+        <p id="graph-error" class="empty graph-error" hidden>Yerel soy ağacı verisi açılamadı.</p>
+        <details class="legend">
+          <summary><span>Gösterge</span><span class="legend-dots" aria-hidden="true"><i class="dot tun"></i><i class="dot ver"></i><i class="dot both"></i></span></summary>
+          <div class="legend-body">
+            <span><i class="dot tun"></i>Tunçgenç</span>
+            <span><i class="dot ver"></i>Veryeri</span>
+            <span><i class="dot both"></i>İki tabloda ortak</span>
+            <span><i class="line parent"></i>Üst kuşak → alt kuşak</span>
+            <span><i class="line spouse"></i>Eş</span>
+            <span><i class="line step"></i>Üvey bağı</span>
+            <span><i class="line unclear"></i>Bağ türü belirsiz</span>
+          </div>
+        </details>
+        <div class="map-controls" role="group" aria-label="Ağ görünümü">
+          <button id="zoom-in" type="button" aria-label="Yakınlaştır" title="Yakınlaştır">+</button>
+          <button id="zoom-out" type="button" aria-label="Uzaklaştır" title="Uzaklaştır">−</button>
+          <button id="fit" type="button" aria-label="Ağı ekrana sığdır" title="Ağı ekrana sığdır"><i class="fit-icon" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <footer class="map-foot">
+        <span>Düğüme dokunarak kişiyi, çizgileri izleyerek bağlarını keşfet.</span>
+        <span class="desktop-hint">Sürükle <b>·</b> Yakınlaştır <b>·</b> Seç</span>
+      </footer>
+    </section>
+  </main>
+
+  <dialog id="sources">
+    <div class="dialog-head">
+      <h2>Kaynaklar</h2>
+      <form method="dialog"><button class="icon-button" type="submit" aria-label="Kaynakları kapat">×</button></form>
+    </div>
+    <ul class="source-links">
+      <li>Soyağacı-Tunçgenç</li>
+      <li>Soyağacı-Veryeri</li>
+    </ul>
+    <p>Bağlar tablolardaki soy notlarından, satır sırasından ve kuşak girintilerinden aktarıldı. Alt kuşak çizgisi ilgili aile kolunu gösterir. Farklı tarih değerleri kişi ayrıntılarında kaynaklarıyla birlikte görünür.</p>
+    <p>Görsel düzen <a href="https://graphcommons.com/h/mulksuzlestirme/views/b8b46ef3-a76f-41a5-924a-c0baedb9c037" target="_blank" rel="noreferrer">Graph Commons</a> ağından esinlendi.</p>
+  </dialog>
+</body>
+</html>
