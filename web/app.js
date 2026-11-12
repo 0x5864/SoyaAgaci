@@ -126,12 +126,12 @@ function renderDetails() {
   }
   card.append(actions);
 
-  const groupLabels = ['Anne', 'Baba', 'Ebeveyn (rol belirsiz)', 'Eş', 'Çocuklar', 'Üvey bağı', 'Bağ türü belirsiz'];
+  const groupLabels = ['Anne', 'Baba', 'Eş', 'Çocuklar', 'Üvey bağı', 'Bağ türü belirsiz'];
   const groups = new Map(groupLabels.map(label => [label, new Set()]));
   for (const edge of relations) {
     if (edge.source !== selected && edge.target !== selected) continue;
     const outgoing = edge.source === selected;
-    const parentLabel = edge.role === 'mother' ? 'Anne' : edge.role === 'father' ? 'Baba' : 'Ebeveyn (rol belirsiz)';
+    const parentLabel = edge.role === 'mother' ? 'Anne' : 'Baba';
     const label = edge.kind === 'parent' ? (outgoing ? 'Çocuklar' : parentLabel)
       : ({ spouse: 'Eş', step: 'Üvey bağı', unclear: 'Bağ türü belirsiz' })[edge.kind];
     groups.get(label).add(outgoing ? edge.target : edge.source);
@@ -198,7 +198,7 @@ function applyFilter(next) {
 function displayData(data) {
   activeData = data;
   people = data.people.map(person => ({ ...person }));
-  relations = data.relations;
+  relations = data.relations.filter(showRelationship);
   byId = new Map(people.map(person => [person.id, person]));
   for (const person of people) {
     person.searchable = fold([person.name, ...person.sources.map(source => source.name)].join(' '));

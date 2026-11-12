@@ -4,10 +4,17 @@ const draftKey = 'SoyAgaci.draft.v1';
 const editableDates = ['birth', 'death'];
 const parentRoles = ['mother', 'father'];
 const relationshipOptions = [
-  ['upper', 'Ebeveyn (rol belirsiz)'], ['lower', 'Çocuk (rol belirsiz)'],
   ['mother-child', 'Çocuk (annesi bu kişi)'], ['father-child', 'Çocuk (babası bu kişi)'], ['spouse', 'Eş'],
   ['step', 'Üvey bağı'], ['unclear', 'Bağ türü belirsiz'],
 ];
+
+function isNamedParent(edge) {
+  return edge?.kind === 'parent' && parentRoles.includes(edge.role);
+}
+
+function showRelationship(edge) {
+  return edge.kind !== 'parent' || isNamedParent(edge);
+}
 
 function recordedDates(person, field) {
   if (Object.hasOwn(person.dates ?? {}, field)) {
@@ -90,7 +97,9 @@ function applyDraft(base, draft, allowConflicts = false) {
   if (relations.some(edge => !ids.has(edge.source) || !ids.has(edge.target))) {
     throw new Error('Bir akrabalık bağının kişisi bulunamadı.');
   }
-  const added = draft.relations.filter(change => !change.before && change.after).map(change => change.after);
+  const added = draft.relations
+    .filter(change => isNamedParent(change.after) && !isNamedParent(change.before))
+    .map(change => change.after);
   if (!allowConflicts && addsParentCycle(relations, added)) {
     throw new Error('Taslak ile GitHub’daki bağlar bir kuşak döngüsü oluşturuyor.');
   }
@@ -99,15 +108,14 @@ function applyDraft(base, draft, allowConflicts = false) {
 }
 
 function addsParentCycle(nextEdges, added) {
-  if (!added.some(edge => edge.kind === 'parent')) return false;
+  if (!added.length) return false;
   const children = new Map();
   for (const edge of nextEdges) {
-    if (edge.kind !== 'parent') continue;
+    if (!isNamedParent(edge)) continue;
     if (!children.has(edge.source)) children.set(edge.source, []);
     children.get(edge.source).push(edge.target);
   }
   return added.some(edge => {
-    if (edge.kind !== 'parent') return false;
     const pending = [edge.target];
     const checked = new Set();
     while (pending.length) {
@@ -124,7 +132,7 @@ function addsParentCycle(nextEdges, added) {
 function validateParentRoles(relations) {
   const assigned = new Set();
   for (const edge of relations) {
-    if (edge.kind !== 'parent' || !parentRoles.includes(edge.role)) continue;
+    if (!isNamedParent(edge)) continue;
     const key = edge.target + '/' + edge.role;
     if (assigned.has(key)) throw new Error('Bir kişi için yalnızca bir anne ve bir baba seçilebilir.');
     assigned.add(key);
@@ -149,15 +157,16 @@ function changePerson(data, updated, nextLinks) {
   const remaining = data.relations.flatMap(edge => {
     if (!incident(edge)) return [edge];
     const key = relationshipKey(edge);
-    if (!kept.has(key)) return [];
+    if (!kept.has(key)) return showRelationship(edge) ? [] : [edge];
     const replacement = kept.get(key);
     kept.delete(key);
     return [replacement];
   });
-  const added = [...kept.values()];
-  const relations = [...remaining, ...added];
+  const relations = [...remaining, ...kept.values()];
+  const added = relations.filter(edge => incident(edge) && isNamedParent(edge)
+    && !isNamedParent(originalLinks.get(relationshipKey(edge))));
   if (addsParentCycle(relations, added)) {
-    throw new Error('Ebeveyn ve çocuk bağları döngü oluşturuyor. Bağların yönünü kontrol et.');
+    throw new Error('Anne, baba ve çocuk bağları döngü oluşturuyor. Bağların yönünü kontrol et.');
   }
   validateParentRoles(relations);
   return { people: [...people.values()], relations };
@@ -196,9 +205,7 @@ function createPersonEditor(onSave) {
     if (edge) {
       const outgoing = edge.source === person.id;
       peer.value = outgoing ? edge.target : edge.source;
-      type.value = edge.kind === 'parent'
-        ? (outgoing ? (edge.role ? edge.role + '-child' : 'lower') : 'upper')
-        : edge.kind;
+      type.value = isNamedParent(edge) ? edge.role + '-child' : edge.kind;
     }
     const remove = make('button', 'icon-button', '×');
     remove.type = 'button';
@@ -253,12 +260,8 @@ function createPersonEditor(onSave) {
         const type = row.querySelector('[data-kind]').value;
         if (!peer && !type) return [];
         if (!peer || !type) throw new Error('Her akrabalık bağı için kişi ve bağ türünü seç.');
-        if (type === 'upper') {
-          if (parents.some(edge => edge.source === peer)) return [];
-          return [{ source: peer, target: id, kind: 'parent', role: null }];
-        }
-        if (type === 'lower' || type.endsWith('-child')) {
-          const role = type === 'lower' ? null : type.replace('-child', '');
+        if (type.endsWith('-child')) {
+          const role = type.replace('-child', '');
           return [{ source: id, target: peer, kind: 'parent', role }];
         }
         return [{ source: id, target: peer, kind: type }];
@@ -311,7 +314,8 @@ function createPersonEditor(onSave) {
     for (const role of parentRoles) fillPersonSelect(fields.namedItem(role), 'Belirtilmemiş');
     if (person) {
       for (const edge of data.relations) {
-        if (edge.kind === 'parent' && edge.target === person.id && parentRoles.includes(edge.role)) {
+        if (!showRelationship(edge)) continue;
+        if (isNamedParent(edge) && edge.target === person.id) {
           fields.namedItem(edge.role).value = edge.source;
           continue;
         }
