@@ -154,8 +154,6 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
   let positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
   const context = canvas.getContext('2d');
   let byId = new Map(people.map(person => [person.id, person]));
-  let currentPeople = people;
-  let currentRelations = relations;
   let width = 0;
   let height = 0;
   let ratio = 1;
@@ -191,11 +189,11 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
     const baseRadius = clamp(Math.sqrt(camera.scale), .68, 1.75);
-    points = new Map(currentPeople.map(person => [
+    points = new Map(people.map(person => [
       person.id, { ...view(person), r: (2.9 + Math.sqrt(person.degree) * 1.48 + (rank.has(person.id) ? 2 : 0)) * baseRadius },
     ]));
 
-    for (const edge of currentRelations) {
+    for (const edge of relations) {
       const a = points.get(edge.source);
       const b = points.get(edge.target);
       const active = selected && (edge.source === selected || edge.target === selected);
@@ -228,7 +226,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     }
     context.setLineDash([]);
 
-    for (const person of currentPeople) {
+    for (const person of people) {
       const { x, y, r } = points.get(person.id);
       const focused = selected === person.id || hover === person.id;
       context.globalAlpha = selected && !neighbors.has(person.id) && !focused ? .22 : 1;
@@ -248,7 +246,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     }
 
     const crowded = width < 530;
-    const candidates = currentPeople.filter(person => {
+    const candidates = people.filter(person => {
       if (person.id === selected || person.id === hover) return true;
       if (selected) return neighbors.has(person.id);
       return rank.has(person.id) || (!crowded && person.degree >= 4) || camera.scale >= .77;
@@ -320,9 +318,9 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     animation = requestAnimationFrame(step);
   }
 
-  function fit(group = currentPeople, animate = true) {
+  function fit(group = people, animate = true) {
     if (!group.length || !width || !height) return;
-    fitted = group === currentPeople;
+    fitted = group === people;
     const xs = group.map(p => p.x);
     const ys = group.map(p => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -363,7 +361,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     }
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
-    if (fitted) fit(currentPeople, false);
+    if (fitted) fit(people, false);
     frame();
   }
   new ResizeObserver(resize).observe(canvas);
@@ -482,13 +480,10 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     replace(nextPeople, nextRelations) {
       arrange(nextPeople, nextRelations);
       people = nextPeople;
+      relations = nextRelations;
       byId = new Map(people.map(person => [person.id, person]));
       positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
       orientPositions();
-    },
-    filter(visiblePeople, visibleRelations) {
-      currentPeople = visiblePeople;
-      currentRelations = visibleRelations;
       hideTooltip();
       fit();
       frame();
@@ -496,13 +491,13 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     select(id) {
       selected = id;
       neighbors = new Set(id ? [id] : []);
-      for (const edge of currentRelations) {
+      for (const edge of relations) {
         if (edge.source === id) neighbors.add(edge.target);
         if (edge.target === id) neighbors.add(edge.source);
       }
       frame();
     },
-    focus() { fit(currentPeople.filter(person => neighbors.has(person.id))); },
+    focus() { fit(people.filter(person => neighbors.has(person.id))); },
     reveal(id) {
       const person = byId.get(id);
       if (!person) return;

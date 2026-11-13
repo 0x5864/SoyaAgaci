@@ -10,13 +10,10 @@ const list = get('people-list');
 const sidebar = get('sidebar-scroll');
 const mobile = matchMedia('(max-width: 690px)');
 const sortNames = new Intl.Collator('tr');
-let filter = 'all';
 let selected = null;
 let graph;
 let people = [];
 let relations = [];
-let visiblePeople = [];
-let visibleRelations = [];
 let byId = new Map();
 let publishedData;
 let activeData;
@@ -68,8 +65,8 @@ function personButton(person) {
 
 function matchedPeople() {
   const tokens = fold(search.value.trim()).split(/\s+/).filter(Boolean);
-  if (!tokens.length) return visiblePeople;
-  return visiblePeople.filter(person => tokens.every(token => person.searchable.includes(token)));
+  if (!tokens.length) return people;
+  return people.filter(person => tokens.every(token => person.searchable.includes(token)));
 }
 
 function renderList() {
@@ -77,9 +74,7 @@ function renderList() {
   const searching = Boolean(search.value.trim());
   const sorted = [...matched].sort((a, b) => sortNames.compare(a.name, b.name) || sortNames.compare(years(a), years(b)));
   const landmarks = ['v7', 'v130', 'v131', 'v-recep', 't5'];
-  const featured = searching ? [] : filter === 'all'
-    ? landmarks.map(id => byId.get(id))
-    : [...matched].sort((a, b) => b.visibleDegree - a.visibleDegree).slice(0, 5);
+  const featured = searching ? [] : landmarks.map(id => byId.get(id));
   const listed = new Set(featured.map(person => person.id));
   const allRows = [...featured, ...sorted.filter(person => !listed.has(person.id))].map((person, index) => {
     const row = make('li');
@@ -158,7 +153,6 @@ function togglePanel(open, focusSearch = false) {
 }
 
 function select(id, focusDetails = false) {
-  if (id && filter !== 'all' && !visiblePeople.some(person => person.id === id)) applyFilter('all');
   selected = id;
   graph.select(id);
   renderDetails();
@@ -167,32 +161,6 @@ function select(id, focusDetails = false) {
   sidebar.scrollTop = 0;
   if (mobile.matches) togglePanel(true);
   if (focusDetails) detail.querySelector('h3').focus();
-}
-
-function applyFilter(next) {
-  filter = next;
-  visibleRelations = filter === 'all' ? relations : relations.filter(edge =>
-    edge.kind === 'parent' && edge.role === filter);
-  const visibleIds = new Set(visibleRelations.flatMap(edge => [edge.source, edge.target]));
-  visiblePeople = filter === 'all' ? people : people.filter(person => visibleIds.has(person.id));
-  for (const person of visiblePeople) person.visibleDegree = 0;
-  for (const edge of visibleRelations) {
-    byId.get(edge.source).visibleDegree++;
-    byId.get(edge.target).visibleDegree++;
-  }
-  if (!visiblePeople.some(person => person.id === selected)) selected = null;
-  for (const button of get('filters').querySelectorAll('button')) {
-    button.setAttribute('aria-pressed', String(button.dataset.filter === filter));
-  }
-  const unnamed = visiblePeople.filter(person => person.unnamed).length;
-  const total = visiblePeople.length - unnamed;
-  const summary = [total + ' kişi', unnamed ? unnamed + ' isimsiz kayıt' : '', visibleRelations.length + ' bağ'];
-  get('map-count').textContent = summary.filter(Boolean).join(' · ');
-  graph.filter(visiblePeople, visibleRelations);
-  graph.select(selected);
-  renderList();
-  renderDetails();
-  sidebar.scrollTop = 0;
 }
 
 function displayData(data) {
@@ -210,7 +178,15 @@ function displayData(data) {
   }
   if (graph) graph.replace(people, relations);
   else graph = createGraph(get('network'), get('tooltip'), people, relations, id => select(id));
-  applyFilter(filter);
+  if (!byId.has(selected)) selected = null;
+  const unnamed = people.filter(person => person.unnamed).length;
+  const total = people.length - unnamed;
+  const summary = [total + ' kişi', unnamed ? unnamed + ' isimsiz kayıt' : '', relations.length + ' bağ'];
+  get('map-count').textContent = summary.filter(Boolean).join(' · ');
+  graph.select(selected);
+  renderList();
+  renderDetails();
+  sidebar.scrollTop = 0;
 }
 
 function updateDraftStatus() {
@@ -324,10 +300,6 @@ async function load() {
   addPerson.disabled = false;
   addPerson.addEventListener('click', () => openEditor(activeData, null));
 
-  get('filters').addEventListener('click', event => {
-    const button = event.target.closest('[data-filter]');
-    if (button && button.dataset.filter !== filter) applyFilter(button.dataset.filter);
-  });
   panel.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (!button) return;

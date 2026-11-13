@@ -8,10 +8,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Soy Ağacı · Tunçgenç &amp; Veryeri</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./style.css?v=5">
-  <script src="./graph.js?v=4" defer></script>
+  <link rel="stylesheet" href="./style.css?v=6">
+  <script src="./graph.js?v=5" defer></script>
   <script src="./editor.js?v=6" defer></script>
-  <script src="./app.js?v=6" defer></script>
+  <script src="./app.js?v=7" defer></script>
 </head>
 <body id="anasayfa">
   <header class="masthead">
@@ -57,11 +57,16 @@
           <p id="map-count" role="status">Soy ağacı yükleniyor…</p>
         </div>
         <div class="map-actions">
-          <div id="filters" class="filters" role="group" aria-label="Anne ve baba bağı filtresi">
-            <button type="button" data-filter="all" aria-pressed="true">Tüm ağ</button>
-            <button type="button" data-filter="mother" aria-pressed="false"><i class="dot mother"></i>Anne</button>
-            <button type="button" data-filter="father" aria-pressed="false"><i class="dot father"></i>Baba</button>
-          </div>
+          <details class="legend">
+            <summary><span>Gösterge</span><span class="legend-dots" aria-hidden="true"><i class="dot mother"></i><i class="dot father"></i></span></summary>
+            <div class="legend-body">
+              <span><i class="line mother"></i>Anne → Çocuk</span>
+              <span><i class="line father"></i>Baba → Çocuk</span>
+              <span><i class="line spouse"></i>Eş</span>
+              <span><i class="line step"></i>Üvey bağı</span>
+              <span><i class="line unclear"></i>Bağ türü belirsiz</span>
+            </div>
+          </details>
           <button id="show-panel" class="plain-button mobile-only" type="button" aria-controls="people-panel" aria-expanded="false"><i class="search-icon" aria-hidden="true"></i>Kişiler</button>
         </div>
       </div>
@@ -69,16 +74,6 @@
         <canvas id="network" aria-label="Etkileşimli aile ağı. Klavye ile gezinmek için Kişiler panelini kullanın."></canvas>
         <div id="tooltip" class="tooltip" hidden></div>
         <p id="graph-error" class="empty graph-error" hidden>Yerel soy ağacı verisi açılamadı.</p>
-        <details class="legend">
-          <summary><span>Gösterge</span><span class="legend-dots" aria-hidden="true"><i class="dot mother"></i><i class="dot father"></i></span></summary>
-          <div class="legend-body">
-            <span><i class="line mother"></i>Anne → Çocuk</span>
-            <span><i class="line father"></i>Baba → Çocuk</span>
-            <span><i class="line spouse"></i>Eş</span>
-            <span><i class="line step"></i>Üvey bağı</span>
-            <span><i class="line unclear"></i>Bağ türü belirsiz</span>
-          </div>
-        </details>
         <div class="map-controls" role="group" aria-label="Ağ görünümü">
           <button id="zoom-in" type="button" aria-label="Yakınlaştır" title="Yakınlaştır">+</button>
           <button id="zoom-out" type="button" aria-label="Uzaklaştır" title="Uzaklaştır">−</button>
