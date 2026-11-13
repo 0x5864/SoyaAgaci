@@ -26,6 +26,21 @@ function recordedDates(person, field) {
     .filter(Boolean))];
 }
 
+function birthOrderKey(person) {
+  const dates = recordedDates(person, 'birth');
+  if (dates.length === 1 && dates[0].length === 10) return dates[0];
+  const years = new Set(dates.map(date => date.slice(0, 4)));
+  return years.size === 1 ? [...years][0] + '-99-99' : '';
+}
+
+function compareBirthOrder(a, b) {
+  const first = a.birthOrder;
+  const second = b.birthOrder;
+  if (!first) return second ? 1 : 0;
+  if (!second) return -1;
+  return first.localeCompare(second);
+}
+
 function parseEditorDate(value) {
   const input = value.trim();
   if (!input) return null;

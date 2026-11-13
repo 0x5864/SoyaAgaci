@@ -30,6 +30,9 @@ function arrange(people, relations) {
       companions.get(anchor).push(person.id);
     }
   }
+  for (const group of children.values()) {
+    group.sort((a, b) => compareBirthOrder(byId.get(a), byId.get(b)));
+  }
 
   const weights = new Map();
   function weight(id) {
@@ -149,11 +152,48 @@ function arrange(people, relations) {
   }
 }
 
+function orderedChildLinks(relations, byId) {
+  const children = new Map();
+  for (const { source, target, kind } of relations) {
+    if (kind !== 'parent') continue;
+    if (!children.has(source)) children.set(source, []);
+    children.get(source).push(target);
+  }
+  for (const ids of children.values()) {
+    ids.sort((a, b) => compareBirthOrder(byId.get(a), byId.get(b)));
+  }
+  return children;
+}
+
+function childArrowDirections(children, points) {
+  const directions = new Map();
+  for (const [parent, ids] of children) {
+    if (ids.length < 2) continue;
+    const origin = points.get(parent);
+    let dx = 0;
+    let dy = 0;
+    for (const id of ids) {
+      const child = points.get(id);
+      const distance = Math.hypot(child.x - origin.x, child.y - origin.y) || 1;
+      dx += (child.x - origin.x) / distance;
+      dy += (child.y - origin.y) / distance;
+    }
+    // Give each parent's arrows their own clockwise order, even when the
+    // children also have another parent with links to other branches.
+    const center = Math.atan2(dy, dx);
+    const spacing = Math.min(.42, 2.3 / (ids.length - 1));
+    directions.set(parent, new Map(ids.map((id, i) =>
+      [id, center + (i - (ids.length - 1) / 2) * spacing])));
+  }
+  return directions;
+}
+
 function createGraph(canvas, tooltip, people, relations, onSelect) {
   arrange(people, relations);
   let positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
   const context = canvas.getContext('2d');
   let byId = new Map(people.map(person => [person.id, person]));
+  let childLinks = orderedChildLinks(relations, byId);
   let width = 0;
   let height = 0;
   let ratio = 1;
@@ -192,6 +232,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
     points = new Map(people.map(person => [
       person.id, { ...view(person), r: (2.9 + Math.sqrt(person.degree) * 1.48 + (rank.has(person.id) ? 2 : 0)) * baseRadius },
     ]));
+    const directions = childArrowDirections(childLinks, points);
 
     for (const edge of relations) {
       const a = points.get(edge.source);
@@ -201,18 +242,27 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const dy = b.y - a.y;
       const distance = Math.hypot(dx, dy);
       if (distance < a.r + b.r + 2) continue;
-      const ux = dx / distance;
-      const uy = dy / distance;
-      const end = { x: b.x - ux * b.r, y: b.y - uy * b.r };
       const isParent = edge.kind === 'parent';
+      const angle = isParent ? directions.get(edge.source)?.get(edge.target) : undefined;
+      const curved = angle !== undefined && distance > a.r + b.r + 12;
+      const departureX = curved ? Math.cos(angle) : dx / distance;
+      const departureY = curved ? Math.sin(angle) : dy / distance;
+      const curveLength = Math.max(a.r + 4, Math.min(52, distance * .35));
+      const controlX = a.x + departureX * curveLength;
+      const controlY = a.y + departureY * curveLength;
+      const approach = curved ? Math.hypot(b.x - controlX, b.y - controlY) : distance;
+      const ux = curved ? (b.x - controlX) / approach : dx / distance;
+      const uy = curved ? (b.y - controlY) / approach : dy / distance;
+      const end = { x: b.x - ux * b.r, y: b.y - uy * b.r };
       const color = isParent ? parentColors[edge.role] ?? '#79899a' : otherEdgeColors[edge.kind];
       context.globalAlpha = selected ? (active ? .94 : .15) : .83;
       context.strokeStyle = color;
       context.lineWidth = active ? 1.55 : 1;
       context.setLineDash(isParent ? [] : edge.kind === 'spouse' ? [4, 3] : [1.4, 3.4]);
       context.beginPath();
-      context.moveTo(a.x + ux * a.r, a.y + uy * a.r);
-      context.lineTo(end.x, end.y);
+      context.moveTo(a.x + departureX * a.r, a.y + departureY * a.r);
+      if (curved) context.quadraticCurveTo(controlX, controlY, end.x, end.y);
+      else context.lineTo(end.x, end.y);
       context.stroke();
       if (isParent && distance > 25) {
         const length = active ? 5.5 : 4.2;
@@ -254,6 +304,8 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const focusRank = person => person.id === selected ? 2000 : person.id === hover ? 1800 : priority(person);
       return focusRank(b) - focusRank(a);
     });
+    const selectedChildren = childLinks.get(selected) ?? [];
+    const childNumbers = new Map(selectedChildren.length > 1 ? selectedChildren.map((id, i) => [id, i + 1]) : []);
     const labels = [];
     for (const person of candidates) {
       const { x, y, r } = points.get(person.id);
@@ -261,7 +313,9 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       const main = rank.has(person.id);
       const size = focus ? 14 : main ? (crowded ? 11 : 14) : 11;
       const shortName = person.name.replace(/ \([^)]+\)/g, '');
-      const name = focus || camera.scale > 1 ? person.name : shortName;
+      const label = focus || camera.scale > 1 ? person.name : shortName;
+      const number = childNumbers.get(person.id);
+      const name = number ? number + '. ' + label : label;
       context.font = `${focus || main ? 700 : 560} ${size}px "DM Sans", system-ui, sans-serif`;
       const textWidth = context.measureText(name).width;
       const gap = r + 5;
@@ -482,6 +536,7 @@ function createGraph(canvas, tooltip, people, relations, onSelect) {
       people = nextPeople;
       relations = nextRelations;
       byId = new Map(people.map(person => [person.id, person]));
+      childLinks = orderedChildLinks(relations, byId);
       positions = new Map(people.map(person => [person.id, { x: person.x, y: person.y }]));
       orientPositions();
       hideTooltip();

@@ -95,6 +95,35 @@ function dateLabel(value) {
   return day ? day + '.' + month + '.' + year : year;
 }
 
+function ageInYears(birth, end) {
+  const yearDifference = Number(end.slice(0, 4)) - Number(birth.slice(0, 4));
+  return yearDifference - Number(end.slice(5) < birth.slice(5));
+}
+
+function ageLabel(person) {
+  const births = recordedDates(person, 'birth');
+  const deaths = recordedDates(person, 'death');
+  const label = deaths.length ? 'Ölüm yaşı' : 'Yaş';
+  const now = new Date();
+  const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map(part => String(part).padStart(2, '0')).join('-');
+  const ends = deaths.length ? deaths : [today];
+  const limits = date => date.length === 4 ? [date + '-01-01', date + '-12-31'] : [date, date];
+  const ages = [];
+  for (const birth of births) {
+    const [earliestBirth, latestBirth] = limits(birth);
+    for (const end of ends) {
+      const [earliestEnd, latestEnd] = limits(end);
+      if (latestEnd < earliestBirth) continue;
+      ages.push(Math.max(0, ageInYears(latestBirth, earliestEnd)), ageInYears(earliestBirth, latestEnd));
+    }
+  }
+  if (!ages.length) return label + ' · Belirtilmemiş';
+  const min = Math.min(...ages);
+  const max = Math.max(...ages);
+  return label + ' · ' + (min === max ? min : min + '–' + max);
+}
+
 function renderDetails() {
   detail.hidden = !selected;
   results.hidden = Boolean(selected);
@@ -119,6 +148,7 @@ function renderDetails() {
     const dates = recordedDates(person, field).sort().map(dateLabel);
     if (dates.length) card.append(make('p', 'record', label + ' · ' + dates.join(' / ')));
   }
+  card.append(make('p', 'record person-age', ageLabel(person)));
   card.append(actions);
 
   const groupLabels = ['Anne', 'Baba', 'Eş', 'Çocuklar', 'Üvey bağı', 'Bağ türü belirsiz'];
@@ -135,9 +165,11 @@ function renderDetails() {
     if (!group.size) continue;
     const section = make('section', 'detail-group');
     const items = make('ul', 'relations-list');
-    for (const id of group) {
+    const members = [...group].map(id => byId.get(id));
+    if (label === 'Çocuklar') members.sort(compareBirthOrder);
+    for (const member of members) {
       const item = make('li');
-      item.append(personButton(byId.get(id)));
+      item.append(personButton(member));
       items.append(item);
     }
     section.append(make('h4', '', label), items);
@@ -170,6 +202,7 @@ function displayData(data) {
   byId = new Map(people.map(person => [person.id, person]));
   for (const person of people) {
     person.searchable = fold([person.name, ...person.sources.map(source => source.name)].join(' '));
+    person.birthOrder = birthOrderKey(person);
     person.degree = 0;
   }
   for (const edge of relations) {
